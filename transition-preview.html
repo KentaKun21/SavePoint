@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SavePoint – P5 Transition Preview</title>
+<style>
+  :root { --red: #e60018; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #050505; color: #fff;
+    min-height: 100dvh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+  h1 { font-size: 15px; letter-spacing: .06em; margin-bottom: 2px; }
+  p.sub { color: #777; font-size: 12px; margin-bottom: 12px; text-align: center; }
+  .phone {
+    width: min(100%, 340px);
+    height: min(68dvh, 580px);
+    background: #0d0d0d;
+    border: 3px solid #333; border-radius: 24px;
+    position: relative; overflow: hidden;
+    box-shadow: 0 16px 40px rgba(0,0,0,.7);
+  }
+  .home {
+    position: absolute; inset: 0; background: #151515;
+    display: flex; flex-direction: column;
+    padding: 18px 14px 64px;
+  }
+  .home h2 { font-size: 20px; margin-bottom: 10px; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; }
+  .card {
+    background: #2a2a2a; border: 2px solid #fff;
+    aspect-ratio: 3/4; display: grid; place-items: center;
+    font-size: 11px; color: #999; box-shadow: 3px 3px 0 var(--red);
+  }
+  .nav {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 52px;
+    background: #0b0b0b; border-top: 3px solid var(--red);
+    display: flex; align-items: center; justify-content: space-around;
+    font-size: 10px; font-weight: 800; letter-spacing: .05em;
+  }
+  .nav span.on { color: var(--red); }
+
+  #sh {
+    position: absolute; inset: 0;
+    background: linear-gradient(165deg, #c40812, #5c040c);
+    display: none; overflow: hidden; z-index: 10;
+  }
+  #sh.on { display: block; }
+
+  /* OPEN – diagonal red cover wipe (video 1) */
+  @keyframes p5CoverIn {
+    0%   { clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%); }
+    100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+  }
+  @keyframes p5CoverOut {
+    0%   { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+    100% { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); }
+  }
+  /* CLOSE – expanding torn hole (video 2) */
+  @keyframes p5TearIn {
+    0%   { clip-path: polygon(50% 50%,50% 50%,50% 50%,50% 50%,50% 50%,50% 50%,50% 50%,50% 50%); }
+    35%  { clip-path: polygon(42% 38%,58% 35%,68% 48%,62% 62%,48% 68%,35% 58%,32% 45%,40% 40%); }
+    70%  { clip-path: polygon(18% 12%,78% 8%,95% 42%,88% 88%,45% 98%,5% 85%,2% 40%,12% 15%); }
+    100% { clip-path: polygon(-30% -30%,130% -30%,130% 130%,-30% 130%,-30% -30%,-30% -30%,-30% -30%,-30% -30%); }
+  }
+  @keyframes p5SheetIn {
+    0% { opacity: 0; } 100% { opacity: 1; }
+  }
+
+  #sh.red-in::before {
+    content: "";
+    position: absolute; inset: 0; z-index: 30;
+    background: #e60018; pointer-events: none;
+    animation: p5CoverIn .28s cubic-bezier(.2,.8,.2,1) forwards,
+               p5CoverOut .32s cubic-bezier(.4,0,.6,1) .34s forwards;
+  }
+  #sh.red-in .sheet-inner {
+    animation: p5SheetIn .2s ease .45s both;
+  }
+  #sh.paper-out::after {
+    content: "";
+    position: absolute; inset: 0; z-index: 40;
+    background: #0a0a0a; pointer-events: none;
+    box-shadow: 0 0 0 3px #fff;
+    animation: p5TearIn .48s cubic-bezier(.25,.8,.25,1) forwards;
+  }
+
+  .sheet-inner { padding: 32px 18px; color: #fff; height: 100%; }
+  .badge {
+    display: inline-block; background: #fff; color: #000;
+    font-size: 11px; font-weight: 900; padding: 5px 12px;
+    transform: skew(-8deg); margin-bottom: 14px;
+  }
+  .sheet-inner h3 { font-size: 26px; line-height: 1.05; margin-bottom: 8px; text-shadow: 3px 3px 0 #000; }
+  .meta { color: #ffc9c9; font-size: 13px; margin-bottom: 22px; }
+  .fake-block {
+    background: rgba(0,0,0,.4); border: 2px solid #fff;
+    padding: 14px; margin-bottom: 12px; box-shadow: 4px 4px 0 #000; font-size: 13px;
+  }
+
+  .btns { display: flex; gap: 10px; margin-top: 16px; width: min(100%, 340px); }
+  button {
+    flex: 1; border: 0; padding: 16px 12px; font-weight: 900; font-size: 14px;
+    letter-spacing: .05em; cursor: pointer; border-radius: 4px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .open-btn { background: var(--red); color: #fff; box-shadow: 4px 4px 0 #fff; }
+  .close-btn { background: #fff; color: #000; box-shadow: 4px 4px 0 var(--red); }
+  button:disabled { opacity: .35; pointer-events: none; }
+  button:active { transform: scale(.96); }
+  .status { margin-top: 12px; font-size: 13px; color: #aaa; min-height: 1.3em; font-weight: 600; text-align: center; }
+  .note { margin-top: 10px; font-size: 11px; color: #555; text-align: center; max-width: 340px; line-height: 1.45; }
+</style>
+</head>
+<body>
+  <h1>P5 TRANSITION PREVIEW</h1>
+  <p class="sub">Matched to your music-player reference clips</p>
+
+  <div class="phone">
+    <div class="home" id="home">
+      <h2>HOME</h2>
+      <div class="cards">
+        <div class="card">GAME A</div>
+        <div class="card">GAME B</div>
+        <div class="card">GAME C</div>
+        <div class="card">GAME D</div>
+      </div>
+      <div class="nav">
+        <span class="on">HOME</span><span>LIBRARY</span><span>BACKLOG</span>
+      </div>
+    </div>
+
+    <div id="sh">
+      <div class="sheet-inner">
+        <span class="badge">GAME</span>
+        <h3>PERSONA 5 ROYAL</h3>
+        <div class="meta">ATLUS · 2019 · PLAYING</div>
+        <div class="fake-block">TRACK / OVERVIEW</div>
+        <div class="fake-block">Rating · Hours · Notes</div>
+        <div class="fake-block">Your progress here</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="btns">
+    <button class="open-btn" id="btnOpen">OPEN GAME ▶</button>
+    <button class="close-btn" id="btnClose" disabled>CLOSE GAME ■</button>
+  </div>
+  <div class="status" id="status">Ready — press OPEN</div>
+  <p class="note">
+    <b>Open:</b> red diagonal wipe covers the screen → solid red → game appears<br>
+    <b>Close:</b> jagged torn-paper hole expands from the center and covers the sheet
+  </p>
+
+<script>
+const sh = document.getElementById('sh');
+const btnOpen = document.getElementById('btnOpen');
+const btnClose = document.getElementById('btnClose');
+const status = document.getElementById('status');
+let busy = false;
+
+btnOpen.onclick = function () {
+  if (busy) return;
+  busy = true;
+  btnOpen.disabled = true;
+  status.textContent = 'Opening… red wipe';
+
+  sh.classList.remove('paper-out');
+  // clear leftover ::after by reflow
+  sh.classList.add('on');
+  void sh.offsetWidth;
+  sh.classList.add('red-in');
+
+  setTimeout(function () {
+    sh.classList.remove('red-in');
+    busy = false;
+    btnClose.disabled = false;
+    status.textContent = 'Open — press CLOSE';
+  }, 680);
+};
+
+btnClose.onclick = function () {
+  if (busy) return;
+  busy = true;
+  btnClose.disabled = true;
+  status.textContent = 'Closing… paper tear';
+
+  sh.classList.remove('red-in');
+  void sh.offsetWidth;
+  sh.classList.add('paper-out');
+
+  setTimeout(function () {
+    sh.classList.remove('paper-out', 'on');
+    busy = false;
+    btnOpen.disabled = false;
+    status.textContent = 'Closed — press OPEN again';
+  }, 500);
+};
+</script>
+</body>
+</html>

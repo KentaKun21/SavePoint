@@ -1,0 +1,12 @@
+{
+  "appId": "com.kentakun21.savepoint",
+  "appName": "SavePoint",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#000000"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

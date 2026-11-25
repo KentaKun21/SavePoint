@@ -1,0 +1,7 @@
+name = "savepoint-api"
+main = "index.js"
+compatibility_date = "2024-11-01"
+
+[vars]
+# Change to your deployed app origin when hosting it publicly.
+ALLOW_ORIGIN = "*"
