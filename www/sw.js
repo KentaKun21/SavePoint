@@ -1,6 +1,6 @@
 // Minimal service worker: lets SavePoint open offline. Always tries the network first,
 // so you never get stuck on an old version. API calls are never cached here.
-const CACHE = "savepoint-shell-v3";
+const CACHE = "savepoint-shell-v4";
 const SHELL = ["./", "index.html", "config.js", "manifest.json", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

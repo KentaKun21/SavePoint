@@ -525,6 +525,36 @@ body.t-lib .bgpat::after {
   animation: none !important;
   transform: none !important;
 }
+
+/* Buttery-smooth rapid tab & game switching polish */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+button, .tb, .sq, .chip, .rr, .lr, .cd, .mix, .nxi, .srow, .pki {
+  touch-action: manipulation;
+}
+#v {
+  contain: layout style;
+  will-change: opacity, transform;
+}
+@keyframes spTabQuickIn {
+  from { opacity: .72; transform: translate3d(0, 4px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+#v.quick-sw {
+  animation: spTabQuickIn .15s cubic-bezier(.22, .85, .36, 1) both;
+}
+.layer#sh {
+  contain: layout paint style;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+#nav .tb {
+  transition: transform .12s cubic-bezier(.2, .8, .2, 1);
+}
+#nav .tb:active {
+  transform: scale(.94);
+}
 </style>
 </head>
 <body>
@@ -940,11 +970,17 @@ function gameDataManagerHTML(){
    '<div class="gdm-sub">Game records &amp; notes: '+fmtBytes(metaBytes)+' · Embedded artwork: '+fmtBytes(coversBytes)+' · Custom lists: '+S.lists.length+'</div>'+
    '<div class="gdm-grid">'+
     '<div class="gdm-stat"><b>'+S.g.length+'</b><span>TOTAL GAMES</span></div>'+
+    '<div class="gdm-stat"><b>'+by('done').length+'</b><span>COMPLETED</span></div>'+
+    '<div class="gdm-stat"><b>'+by('backlog').length+'</b><span>BACKLOG</span></div>'+
+    '<div class="gdm-stat"><b>'+by('playing').length+'</b><span>PLAYING</span></div>'+
+    '<div class="gdm-stat"><b>'+by('paused').length+'</b><span>PAUSED</span></div>'+
+    '<div class="gdm-stat"><b>'+by('wish').length+'</b><span>WISHLIST</span></div>'+
+    '<div class="gdm-stat"><b>'+by('dropped').length+'</b><span>DROPPED</span></div>'+
+    '<div class="gdm-stat"><b>'+(S.g.length-by('wish').length>0?Math.round((by('done').length/(S.g.length-by('wish').length))*100):0)+'%</b><span>CLEAR RATE</span></div>'+
     '<div class="gdm-stat"><b>'+withArt+'/'+(S.g.length||0)+'</b><span>COVER ART READY</span></div>'+
     '<div class="gdm-stat"><b>'+withNotes+'</b><span>WITH NOTES</span></div>'+
-    '<div class="gdm-stat"><b>'+dups.length+'</b><span>DUPLICATE GROUPS</span></div>'+
    '</div>'+
-   '<div class="gdm-sub" style="margin-top:10px">Top genre: <strong style="color:#fff">'+esc(topGenre.toUpperCase())+'</strong> · Rated: <strong style="color:#fff">'+rated+'</strong> · Unrated: <strong style="color:#fff">'+unrated+'</strong></div>'+
+   '<div class="gdm-sub" style="margin-top:10px">Top genre: <strong style="color:#fff">'+esc(topGenre.toUpperCase())+'</strong> · Rated: <strong style="color:#fff">'+rated+'</strong> · Unrated: <strong style="color:#fff">'+unrated+'</strong> · Duplicates: <strong style="color:#fff">'+dups.length+'</strong></div>'+
   '</div>'+
   '<span class="lab w" style="margin-bottom:12px">DUPLICATE MANAGER</span>'+
   '<div class="panel pad" style="margin-top:12px">'+dupRows+(dups.length>1?'<button class="big" style="margin:12px 0 0" data-a="mdupall">MERGE ALL DUPLICATES ('+dups.length+')</button>':'')+'</div>'+
@@ -969,12 +1005,43 @@ lib:function(){var h='<div style="position:relative"><i class="sil h"></i></div>
  var ks=['all'].concat(Object.keys(ST));h+='<div class="chips">'+ks.map(function(k){return'<button class="chip'+(flt===k?' on':'')+'" data-f="'+k+'">'+(k==='all'?'ALL':ST[k].toUpperCase())+'</button>'}).join('')+'</div>';
  var l=S.g.filter(function(g){return(lt!=='favs'||g.fav)&&(flt==='all'||g.s===flt)&&(!q||(g.t+' '+(g.p||[]).join(' ')).toLowerCase().indexOf(q.toLowerCase())>-1)});
  return h+'<div id="lib-results">'+(q?'<button class="big" data-a="new" data-pre="'+esc(q)+'">+ ADD “'+esc(q)+'” ANYWAY</button>':'')+'<div class="res"><h2>RESULT</h2><img src="'+M.dagger+'" alt=""></div>'+(l.map(rr).join('')||(q&&API&&lt==='games'?'':none('Nothing here yet.')))+(q&&API&&lt==='games'?'<div id="ol">'+olHTML()+'</div>':'')+'</div>'},
-queue:function(){var o=['0px','16px','32px','16px'];return'<span class="lab" style="margin:6px 0 4px">AUTOPLAY</span>'+['playing','backlog','wish'].map(function(k){var l=by(k);return'<div class="nxh"><span class="lab w">'+ST[k].toUpperCase()+'</span></div><div class="nx">'+(l.map(function(g,i){return'<button class="nxi" data-open="'+g.id+'" style="--o:'+o[i%4]+';animation-delay:'+i*.06+'s">'+cv(g)+'<b>'+esc(g.t)+'</b>'+pill(g)+'</button>'}).join('')||'<div class="empty" style="color:#fff">Empty.</div>')+'</div>'}).join('')},
+queue:function(){
+ var o=['0px','16px','32px','16px'];
+ var totalCnt=S.g.length,
+     doneCnt=by('done').length,
+     backlogCnt=by('backlog').length,
+     playingCnt=by('playing').length,
+     pausedCnt=by('paused').length,
+     wishCnt=by('wish').length,
+     dropCnt=by('dropped').length,
+     pool=totalCnt-wishCnt,
+     clearPct=pool>0?Math.round((doneCnt/pool)*100):0,
+     totalHrs=S.g.reduce(function(a,g){return a+(+g.h||0)},0);
+ var summary='<span class="lab" style="margin:6px 0 10px">LIBRARY OVERVIEW</span>'+
+  '<div class="panel pad" style="margin:10px 0 16px">'+
+   '<div class="gdm-grid" style="margin-top:0">'+
+    '<div class="gdm-stat"><b>'+totalCnt+'</b><span>TOTAL GAMES</span></div>'+
+    '<div class="gdm-stat"><b>'+doneCnt+'</b><span>FINISHED</span></div>'+
+    '<div class="gdm-stat"><b>'+backlogCnt+'</b><span>IN BACKLOG</span></div>'+
+    '<div class="gdm-stat"><b>'+playingCnt+'</b><span>PLAYING NOW</span></div>'+
+    '<div class="gdm-stat"><b>'+pausedCnt+'</b><span>PAUSED</span></div>'+
+    '<div class="gdm-stat"><b>'+wishCnt+'</b><span>WISHLIST</span></div>'+
+    '<div class="gdm-stat"><b>'+dropCnt+'</b><span>DROPPED</span></div>'+
+    '<div class="gdm-stat"><b>'+clearPct+'%</b><span>CLEAR RATE</span></div>'+
+   '</div>'+
+   '<div class="gdm-sub" style="margin-top:10px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">'+
+    '<span>Total playtime logged: <strong style="color:#fff">'+totalHrs+'h</strong></span>'+
+    '<span>Active queue: <strong style="color:#fff">'+(playingCnt+backlogCnt)+'</strong></span>'+
+   '</div>'+
+   (backlogCnt?'<button type="button" class="big" style="margin:12px 0 0" data-a="randbk">🎲 PICK RANDOM BACKLOG GAME</button>':'')+
+  '</div>';
+ return summary+'<span class="lab" style="margin:6px 0 4px">AUTOPLAY</span>'+['playing','backlog','wish'].map(function(k){var l=by(k);return'<div class="nxh"><span class="lab w">'+ST[k].toUpperCase()+'</span></div><div class="nx">'+(l.map(function(g,i){return'<button class="nxi" data-open="'+g.id+'" style="--o:'+o[i%4]+';animation-delay:'+i*.06+'s">'+cv(g)+'<b>'+esc(g.t)+'</b>'+pill(g)+'</button>'}).join('')||'<div class="empty" style="color:#fff">Empty.</div>')+'</div>'}).join('');
+},
 me:function(){var P=S.pf,fv=S.g.filter(function(g){return g.fav}),bn=S.g.filter(function(g){return g.id===P.ban})[0]||fv[0],done=by('done'),yr=done.filter(function(g){return g.fin&&g.fin.slice(0,4)===T.slice(0,4)}).length,hrs=S.g.reduce(function(a,g){return a+(+g.h||0)},0),rt=S.g.filter(function(g){return g.r}),avg=rt.length?(rt.reduce(function(a,g){return a+g.r},0)/rt.length).toFixed(1):'–',pc={};
  S.g.forEach(function(g){(g.p||[]).forEach(function(p){pc[p]=(pc[p]||0)+1})});var tp=Object.keys(pc).sort(function(a,b){return pc[b]-pc[a]})[0]||'–';
  return'<div class="hero" style="--bg:'+(bn&&bn.c?'url('+cu(bn.c)+')':'var(--i-joker)')+'"></div><div class="pf"><button class="pic" data-a="pic" style="'+(P.pic?'background-image:url('+P.pic+')':'')+'" aria-label="Change picture">'+(P.pic?'':'+')+'</button><input id="pn" value="'+esc(P.n)+'" maxlength="24" aria-label="Name"></div>'+
  '<span class="lab" style="margin:6px 0 12px">SHOWCASE</span>'+(fv.length?'<div class="grid">'+fv.slice(0,3).map(function(g){return'<button class="cd" style="aspect-ratio:3/4;border:3px solid #fff;'+bgi(g)+'" data-open="'+g.id+'">'+(g.c?'':esc(g.t))+'</button>'}).join('')+'</div>':'<div class="panel pad">'+none('Favorite games to show them here.')+'</div>')+
- '<span class="lab w" style="margin:6px 0 12px">YEAR IN REVIEW</span><div class="panel stats" style="grid-template-columns:repeat(2,1fr);margin-top:12px"><div><b>'+yr+'</b>Finished '+T.slice(0,4)+'</div><div><b>'+done.length+'</b>All-time clears</div><div><b>'+hrs+'</b>Hours logged</div><div><b>'+avg+'</b>Avg rating</div><div style="grid-column:span 2"><b style="font-size:23px">'+esc(tp)+'</b>Most-owned platform</div></div>'},
+ '<span class="lab w" style="margin:6px 0 12px">YEAR IN REVIEW</span><div class="panel stats" style="grid-template-columns:repeat(2,1fr);margin-top:12px"><div><b>'+yr+'</b>Finished '+T.slice(0,4)+'</div><div><b>'+done.length+'</b>All-time clears</div><div><b>'+by('backlog').length+'</b>In backlog</div><div><b>'+by('playing').length+'</b>Playing now</div><div><b>'+hrs+'</b>Hours logged</div><div><b>'+avg+'</b>Avg rating</div><div style="grid-column:span 2"><b style="font-size:23px">'+esc(tp)+'</b>Most-owned platform</div></div>'},
 set:function(){var s=S.set;return'<div class="hero" style="--bg:var(--i-system)"></div><span class="lab" style="margin-bottom:12px">GENERAL</span><div class="panel" style="margin-top:12px"><button class="srow" data-a="anim">Animations<b>'+(s.anim?'ON':'OFF')+'</b></button><button class="srow" data-a="def">Default status for new games<b>'+ST[s.def].toUpperCase()+'</b></button></div>'+
  '<span class="lab w" style="margin-bottom:12px">ACCOUNT</span><div class="panel" style="margin-top:12px">'+acctRows()+'<button class="srow" data-a="exp">Copy backup<b>COPY</b></button></div>'+
  '<div class="panel pad"><div class="fld" style="margin:0"><textarea id="ex" placeholder="Paste a backup here to restore it"></textarea></div><button class="big w" style="margin:14px 0 0" data-a="imp">RESTORE BACKUP</button></div>'+
@@ -982,7 +1049,7 @@ set:function(){var s=S.set;return'<div class="hero" style="--bg:var(--i-system)"
 };
 function mini(){var pl=by('playing')[0],pz=by('paused')[0],g=pl||pz,m=$('#mp');if(!g){m.innerHTML='<div class="g1"><b>Nothing playing</b><span class="m">Tap + to log a game</span></div>';return}
  m.innerHTML='<button data-open="'+g.id+'" style="background:none;border:0;padding:0;display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left">'+cv(g)+'<span class="g1"><b>'+esc(g.t)+'</b><span class="m">'+(pl?'Playing':'Paused')+' · '+(g.h||0)+'h · '+(g.pg||0)+'%</span></span></button><button class="mpb" data-a="mph" aria-label="Add one hour">+1H</button><button class="mpb" data-a="mpp" aria-label="'+(pl?'Pause':'Resume')+'">'+(pl?'❚❚':'▶')+'</button>'}
-function render(anim){var v=$('#v');v.innerHTML=V[tab]();v.classList.remove('enter');if(anim){void v.offsetWidth;v.classList.add('enter')}
+function render(anim,quick){var v=$('#v');v.innerHTML=V[tab]();v.classList.remove('enter','quick-sw');if(anim){void v.offsetWidth;v.classList.add('enter')}else if(quick&&S.set.anim){void v.offsetWidth;v.classList.add('quick-sw')}
  var bc=document.body.classList;[].slice.call(bc).forEach(function(c){if(/^t-/.test(c))bc.remove(c)});bc.add('t-'+tab);bc.toggle('noanim',!S.set.anim);bc.toggle('kb',!!window.kbf);$('#ttl').textContent=TTL[tab];$('#ttl').style.fontSize=(TTL[tab].length<=4?44:TTL[tab].length<=6?37:30)+'px';$('#bk').style.display=(tab!=='home'||stk.length>1)?'block':'none';
  [].forEach.call(document.querySelectorAll('#nav .tb'),function(b){b.classList.toggle('on',b.dataset.tab===tab)});
  var a=$('#av'),P=S.pf;a.style.backgroundImage=P.pic?'url('+P.pic+')':'none';a.textContent=P.pic?'':(P.n||'P')[0].toUpperCase();mini();
@@ -1044,7 +1111,7 @@ function route(){var h=location.hash.slice(1)||'home';
  var t=TABS[h]||'home',ch=t!==tab;tab=t;try{localStorage.setItem('sp_last',HASH[t])}catch(e){}if(ch&&t!=='lib')q='';if(ch&&t==='lib'&&!window._keepLt)lt='games';window._keepLt=0;
  var fast=ch&&(Date.now()-(window._lastSw||0)<400);if(ch)window._lastSw=Date.now();
  if(ch){document.body.classList.add('switching');clearTimeout(window._swT);window._swT=setTimeout(function(){document.body.classList.remove('switching')},360)}
- cancelAnimationFrame(window._rafR);window._rafR=requestAnimationFrame(function(){render((ch||was)&&!fast);window.scrollTo(0,ch?0:savedY)})
+ cancelAnimationFrame(window._rafR);window._rafR=requestAnimationFrame(function(){render((ch||was)&&!fast,ch&&fast);window.scrollTo(0,ch?0:savedY)})
 }
 window.addEventListener('hashchange',route);
 document.addEventListener('click',function(e){var b=e.target.closest('[data-sdpage]');if(!b)return;var sc=document.getElementById('sd-pages');if(!sc)return;var n=+b.getAttribute('data-sdpage')||0;sc.scrollTo({left:n*sc.clientWidth,behavior:'smooth'})});
@@ -1076,7 +1143,7 @@ var fileCb=null;$('#file').addEventListener('change',function(e){var f=e.target.
 function stat(v){return Object.keys(ST).filter(function(k){return ST[k]===v})[0]}
 /* events */
 document.addEventListener('click',function(e){var t=e.target,n;if(t&&t.nodeType===3)t=t.parentElement;
- if(n=t.closest('[data-tab]')){if(n.dataset.tab==='lib')lt='games';nav(n.dataset.tab);return}
+ if(n=t.closest('[data-tab]')){if(window._ptNav===n.dataset.tab){window._ptNav=null;return}if(n.dataset.tab==='lib')lt='games';nav(n.dataset.tab);return}
  if(n=t.closest('[data-pi]')){if(!PK)return;var f=PK.cb,v=PK.o[+n.dataset.pi];$('#pk').classList.remove('on');PK=null;if(f)f(v);return}
  if(t.id==='pk'){if(PK){$('#pk').classList.remove('on');PK=null}return}
  if(n=t.closest('[data-ltog]')){var gid=n.dataset.ltog,lid2=n.dataset.lid;var gObj=S.g.filter(function(x){return x.id===gid})[0];if(gObj){if(!Array.isArray(gObj.l))gObj.l=[];var idx=gObj.l.indexOf(lid2);if(idx>-1)gObj.l.splice(idx,1);else gObj.l.push(lid2);save();n.classList.toggle('on',idx===-1);render()}return}
@@ -1102,6 +1169,7 @@ document.addEventListener('click',function(e){var t=e.target,n;if(t&&t.nodeType=
  else if(a==='covx'){sync();D.c='';showSheet()}
  else if(a==='ok')commit();
  else if(a==='del')pick('DELETE THIS GAME?',['Yes, delete it','Cancel'],'',function(v){if(v[0]==='Y'){S.g=S.g.filter(function(g){return g.id!==D.id});save();D=null;return 2}});
+ else if(a==='randbk'){var bkl=by('backlog');if(!bkl.length){msg('YOUR BACKLOG IS EMPTY','OK');return}var pickG=bkl[Math.floor(Math.random()*bkl.length)];openG(pickG.id)}
  else if(a==='mpp'){var g=by('playing')[0]||by('paused')[0];if(g){g.s=g.s==='playing'?'paused':'playing';save();render()}}
  else if(a==='mph'){var g2=by('playing')[0]||by('paused')[0];if(g2){g2.h=(+g2.h||0)+1;save();render()}}
  else if(a==='nl'){var nm=$('#nln').value.trim();if(nm){S.lists.push({id:'l'+Date.now(),n:nm});save();render()}}
@@ -1124,7 +1192,7 @@ document.addEventListener('click',function(e){var t=e.target,n;if(t&&t.nodeType=
 });
 document.addEventListener('change',function(e){if(e.target.id==='opf'){PFILTER=e.target.value;paintOnline()}});
 document.addEventListener('input',function(e){if(e.target.id==='q'){q=e.target.value;searchOnline();updateLibraryResults()}if(e.target.id==='pn'){S.pf.n=e.target.value;save();var a=$('#av');if(!S.pf.pic)a.textContent=(S.pf.n||'P')[0].toUpperCase()}});
-document.addEventListener('pointerdown',function(e){var t=e.target.closest('.tb');if(t){t.classList.add('hit');setTimeout(function(){t.classList.remove('hit')},700)}});
+document.addEventListener('pointerdown',function(e){var t=e.target.closest('.tb');if(t){t.classList.add('hit');setTimeout(function(){t.classList.remove('hit')},700);if(t.dataset.tab){window._ptNav=t.dataset.tab;if(t.dataset.tab==='lib')lt='games';nav(t.dataset.tab)}}});
 (function(){var sp=document.getElementById('splash');if(!sp)return;function rm(){if(sp.parentNode)sp.parentNode.removeChild(sp)}sp.addEventListener('animationend',function(e){if(e.animationName==='spOut')rm()});setTimeout(rm,1400)})();
 document.addEventListener('focusin',function(e){var t=e.target;if(/^(INPUT|TEXTAREA)$/.test(t.tagName)&&t.type!=='range'&&t.type!=='file'){window.kbf=true;document.body.classList.add('kb')}});
 document.addEventListener('focusout',function(){setTimeout(function(){var a=document.activeElement;if(!a||!/^(INPUT|TEXTAREA)$/.test(a.tagName)){window.kbf=false;document.body.classList.remove('kb')}},250)});
