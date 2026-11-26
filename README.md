@@ -123,3 +123,25 @@ After updating this project, replace the Cloudflare Worker code with `worker/ind
 - **Release countdowns** read "OUT IN 86 DAYS", "OUT TOMORROW" or "OUT TODAY" and appear only for games that are not released yet.
 
 Worker routes: `/health`, `/search`, `/game`, `/hot`, `/upcoming`, `/similar`. Required secrets: `RAWG_API_KEY`, `THEGAMESDB_API_KEY`, `STEAMGRIDDB_API_KEY`. Keep all keys in Cloudflare Worker Secrets.
+
+
+---
+
+## Android app (GitHub Actions) and Google sign-in
+
+**Build the APK:** push this folder to GitHub, open the **Actions** tab, run **Build Android APK**, then download `SavePoint-debug` from the run. Install `app-debug.apk` on your phone.
+
+**Why sign-in failed before:** the Firebase web sign-in (popup and redirect) cannot work inside an Android WebView. It needs browser storage and a cross-site page that the WebView blocks, which gives the "missing initial state" error. The APK now uses Google's own native sign-in (the `@capacitor-firebase/authentication` plugin) and passes the result to the Firebase web SDK, so your account, cloud sync and Firestore data stay exactly the same. In a normal browser the web sign-in is still used.
+
+**One-time Firebase step (required):** every APK must be signed with the same key, or Google rejects sign-in. This project includes a fixed key (`android/app/debug.keystore`) that every build uses. Add its fingerprints to Firebase:
+
+1. Firebase console, Project settings, **Your apps**, the Android app `com.kentakun21.savepoint`, **Add fingerprint**.
+2. Add both:
+   - SHA-1: `6C:68:8F:1A:4E:37:28:96:F0:6E:22:22:D6:92:1E:10:E4:4C:AA:E8`
+   - SHA-256: `5B:80:AA:07:99:CF:A3:3D:A4:44:6D:6B:1C:3D:FB:7B:27:39:3B:2B:1A:50:F4:06:78:CB:41:32:D8:5C:41:0F`
+3. Download the new `google-services.json` and replace `android/app/google-services.json`.
+4. Commit, run the workflow again, and install the new APK.
+
+Also confirm Authentication, Sign-in method, **Google** is enabled. The Worker setting `ALLOW_ORIGIN` must allow `https://localhost` (or be `*`), because that is the app's address inside the APK.
+
+**Back button and reopening:** Back closes menus, then the game page, then goes to the previous tab. On Home, the first press shows "Press back again to leave SavePoint", and the second sends the app to the background (it is not closed). When you reopen the app, it returns to the tab you were last on.

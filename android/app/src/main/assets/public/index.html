@@ -16,7 +16,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;color:#fff;font:700 14px/1.15 P5Hatty,'Arial Narrow',sans-serif;overflow-x:hidden;background:#000}
 button{font:inherit;color:inherit;cursor:pointer}
 .a{font-family:P5Hatty,Impact,sans-serif;font-weight:400;letter-spacing:.02em}
-.bgpat{position:fixed;inset:-40%;z-index:-2;background:#101010;transform:rotate(-14deg);overflow:hidden}.bgpat::after{content:"";position:absolute;inset:0;background:var(--i-star) 0 0/460px;filter:invert(1);opacity:.06;animation:bgd 60s linear infinite}
+.bgpat{position:fixed;inset:-40%;z-index:-2;background:#101010;transform:rotate(-14deg);overflow:hidden}.bgpat::after{content:"";position:absolute;inset:-460px;background:var(--i-star) 0 0/460px;filter:invert(1);opacity:.06;animation:bgdT 60s linear infinite;will-change:transform}
 body.t-lib .bgpat,body.t-set .bgpat{background:#000}body.t-lib .bgpat::after,body.t-set .bgpat::after,body.t-queue .bgpat::after,body.t-me .bgpat::after{display:none}
 body.t-queue .bgpat{background:var(--red);animation:none}
 body.t-me .bgpat{background:#101010}
@@ -426,7 +426,7 @@ body.t-lib .bgpat::after {
 /* Library background stays still (no shift on search/re-render) */
 body.t-lib .bgpat {
   background: #000 url(bg-library.webp) center center / cover no-repeat !important;
-  background-attachment: fixed !important;
+  background-attachment: scroll !important;
   transform: none !important;
   inset: 0 !important;
   animation: none !important;
@@ -440,6 +440,14 @@ body.t-lib {
   background: #000 !important;
 }
 
+
+/* game opens: no game background until the red wipe covers the old screen */
+#sh.red-in:not(.bg-ready){background:none !important}
+/* smoother tab switching: decorative loops pause for a moment and move on the GPU */
+@keyframes bgdT{to{transform:translate(460px,460px)}}
+body.switching .sil,body.switching .city,body.switching .city::after,body.switching .hero,body.switching .bgpat::after,body.switching .res img{animation-play-state:paused !important}
+#toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(12px);background:#fff;color:#000;border:3px solid #000;box-shadow:4px 4px 0 #d90a14;padding:6px 16px;font:400 15px P5Hatty,sans-serif;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:2000;white-space:nowrap}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -667,8 +675,16 @@ function pull(x){x.F.getDoc(x.F.doc(x.db,'users',USER.uid)).then(function(snap){
  if(S.uid!==USER.uid&&S.g.length&&(r.ts||0)>0){pick('CLOUD SAVE FOUND',['Merge both saves','Use the cloud save','Keep this device (replaces the cloud)'],'',function(v){if(v[0]==='M'){S=mergeCloud(S,rd);S.uid=USER.uid;save();render(true);loadRec()}else if(v[0]==='U'){S=rd;S.ts=r.ts;S.uid=USER.uid;saveLocal();cloudPush();render(true);loadRec()}else{S.uid=USER.uid;save()}});return}
  if((r.ts||0)>(S.ts||0)){S=rd;S.ts=r.ts;S.uid=USER.uid;saveLocal();render(true);loadRec()}else if((S.ts||0)>(r.ts||0)){S.uid=USER.uid;saveLocal();cloudPush()}else{S.uid=USER.uid;saveLocal();cloudPush()}
  }).catch(syncErr)}
+var NA=null;
+function nativeAuth(){try{var C=window.Capacitor;if(C&&C.isNativePlatform&&C.isNativePlatform()&&C.registerPlugin)return NA||(NA=C.registerPlugin('FirebaseAuthentication'))}catch(e){}return null}
+/* Android: Google's own sign-in sheet gives an ID token; the Firebase JS SDK signs in with it, so cloud sync keeps working unchanged. */
+function nativeSignIn(x){var N=nativeAuth();
+ N.signInWithGoogle().then(function(r){var t=r&&r.credential&&r.credential.idToken;if(!t)throw new Error('no-id-token');return x.A.signInWithCredential(x.auth,x.A.GoogleAuthProvider.credential(t))})
+ .then(function(c){if(c&&c.user){USER=c.user;window.syncBad=0;if(tab==='set')render();msg('SIGNED IN AS '+(USER.email||'GOOGLE'),'OK')}})
+ .catch(function(e){var c=String((e&&(e.code||e.message))||'ERROR');if(/cancel|12501|dismiss|no credential/i.test(c))return;msg('SIGN-IN FAILED: '+c.replace('auth/','').slice(0,70).toUpperCase()+'. SEE README: ADD THE SHA-1 IN FIREBASE.','OK')})}
 function authBtn(){var p=fbInit();if(!p){msg('GOOGLE SIGN-IN IS NOT SET UP YET. SEE README STEP 3.','OK');return}
- p.then(function(x){if(USER){pick('SIGN OUT?',['Yes, sign out','Cancel'],'',function(v){if(v[0]==='Y')x.A.signOut(x.auth)});return}
+ p.then(function(x){if(USER){pick('SIGN OUT?',['Yes, sign out','Cancel'],'',function(v){if(v[0]==='Y'){x.A.signOut(x.auth);var N=nativeAuth();if(N)N.signOut().catch(function(){})}});return}
+  if(nativeAuth()){nativeSignIn(x);return}
   var pr=new x.A.GoogleAuthProvider();
   pr.addScope('email');pr.addScope('profile');
   pr.setCustomParameters({prompt:'select_account'});
@@ -816,7 +832,7 @@ set:function(){var s=S.set;return'<div class="hero" style="--bg:var(--i-system)"
 function mini(){var pl=by('playing')[0],pz=by('paused')[0],g=pl||pz,m=$('#mp');if(!g){m.innerHTML='<div class="g1"><b>Nothing playing</b><span class="m">Tap + to log a game</span></div>';return}
  m.innerHTML='<button data-open="'+g.id+'" style="background:none;border:0;padding:0;display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left">'+cv(g)+'<span class="g1"><b>'+esc(g.t)+'</b><span class="m">'+(pl?'Playing':'Paused')+' · '+(g.h||0)+'h · '+(g.pg||0)+'%</span></span></button><button class="mpb" data-a="mph" aria-label="Add one hour">+1H</button><button class="mpb" data-a="mpp" aria-label="'+(pl?'Pause':'Resume')+'">'+(pl?'❚❚':'▶')+'</button>'}
 function render(anim){var v=$('#v');v.innerHTML=V[tab]();v.classList.remove('enter');if(anim){void v.offsetWidth;v.classList.add('enter')}
- document.body.className=(S.set.anim?'':'noanim ')+'t-'+tab+(window.kbf?' kb':'');$('#ttl').textContent=TTL[tab];$('#ttl').style.fontSize=(TTL[tab].length<=4?44:TTL[tab].length<=6?37:30)+'px';$('#bk').style.display=(tab!=='home'||stk.length>1)?'block':'none';
+ var bc=document.body.classList;[].slice.call(bc).forEach(function(c){if(/^t-/.test(c))bc.remove(c)});bc.add('t-'+tab);bc.toggle('noanim',!S.set.anim);bc.toggle('kb',!!window.kbf);$('#ttl').textContent=TTL[tab];$('#ttl').style.fontSize=(TTL[tab].length<=4?44:TTL[tab].length<=6?37:30)+'px';$('#bk').style.display=(tab!=='home'||stk.length>1)?'block':'none';
  [].forEach.call(document.querySelectorAll('#nav .tb'),function(b){b.classList.toggle('on',b.dataset.tab===tab)});
  var a=$('#av'),P=S.pf;a.style.backgroundImage=P.pic?'url('+P.pic+')':'none';a.textContent=P.pic?'':(P.n||'P')[0].toUpperCase();mini();
  var qi=$('#q');if(qi&&window.typ){qi.focus();qi.setSelectionRange(q.length,q.length)}window.typ=0;}
@@ -845,9 +861,12 @@ function route(){var h=location.hash.slice(1)||'home';
  if(pushing){stk.push(h);pushing=false}else{var j=stk.lastIndexOf(h);if(j>-1&&j<stk.length-1)stk.length=j+1;else if(stk[stk.length-1]!==h)stk.push(h)}
  if(h==='pick'){if(!PK){stk=['home'];location.replace('#home');return}$('#pk').classList.add('on');return}
  $('#pk').classList.remove('on');PK=null;
- if(h==='game'){if(!D){stk=['home'];location.replace('#home');return}if(!$('#sh').classList.contains('on')){showSheet();$('#sh').classList.remove('paper-out','phone-in','red-in');$('#sh').classList.add('on');if(S.set.anim){void $('#sh').offsetWidth;$('#sh').classList.add('red-in');setTimeout(function(){$('#sh').classList.remove('red-in')},680)}$('#sh').scrollTop=0;document.body.style.overflow='hidden'}return}
+ if(h==='game'){if(!D){stk=['home'];location.replace('#home');return}if(!$('#sh').classList.contains('on')){showSheet();$('#sh').classList.remove('paper-out','phone-in','red-in','bg-ready');$('#sh').classList.add('on');if(S.set.anim){void $('#sh').offsetWidth;$('#sh').classList.add('red-in');setTimeout(function(){$('#sh').classList.add('bg-ready')},290);setTimeout(function(){$('#sh').classList.remove('red-in','bg-ready')},680)}$('#sh').scrollTop=0;document.body.style.overflow='hidden'}return}
  var was=$('#sh').classList.contains('on');if(was&&S.set.anim){$('#sh').classList.remove('phone-in');$('#sh').classList.add('paper-out');setTimeout(function(){$('#sh').classList.remove('paper-out','on')},580)}else $('#sh').classList.remove('on');document.body.style.overflow='';
- var t=TABS[h]||'home',ch=t!==tab;tab=t;if(ch&&t!=='lib')q='';if(ch&&t==='lib'&&!window._keepLt)lt='games';window._keepLt=0;render(ch||was);window.scrollTo(0,ch?0:savedY)}
+ var t=TABS[h]||'home',ch=t!==tab;tab=t;try{localStorage.setItem('sp_last',HASH[t])}catch(e){}if(ch&&t!=='lib')q='';if(ch&&t==='lib'&&!window._keepLt)lt='games';window._keepLt=0;
+ var fast=ch&&(Date.now()-(window._lastSw||0)<400);if(ch)window._lastSw=Date.now();
+ if(ch){document.body.classList.add('switching');clearTimeout(window._swT);window._swT=setTimeout(function(){document.body.classList.remove('switching')},520)}
+ cancelAnimationFrame(window._rafR);window._rafR=requestAnimationFrame(function(){render((ch||was)&&!fast);window.scrollTo(0,ch?0:savedY)})}
 window.addEventListener('hashchange',route);
 document.addEventListener('click',function(e){var b=e.target.closest('[data-sdpage]');if(!b)return;var sc=document.getElementById('sd-pages');if(!sc)return;var n=+b.getAttribute('data-sdpage')||0;sc.scrollTo({left:n*sc.clientWidth,behavior:'smooth'})});
 var sdDotFrame=0;document.addEventListener('scroll',function(){if(sdDotFrame)return;sdDotFrame=requestAnimationFrame(function(){sdDotFrame=0;var sc=document.getElementById('sd-pages'),dots=document.getElementById('sd-dots');if(!sc||!dots)return;var n=Math.round(sc.scrollLeft/Math.max(1,sc.clientWidth));dots.querySelectorAll('button').forEach(function(b,i){b.classList.toggle('active',i===n)})})},true);
@@ -935,26 +954,18 @@ loadDisc();
 setTimeout(function(){repairLibrary()},1500);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});
 
-/* Capacitor Android back: navigate in-app instead of exiting */
-(function(){
-  function bindBack(){
-    try{
-      var Cap = window.Capacitor;
-      if(!Cap || !Cap.Plugins || !Cap.Plugins.App) return;
-      Cap.Plugins.App.addListener('backButton', function(e){
-        if(goBack()){ /* stayed in app */ }
-        else if(e && typeof e.canGoBack === 'boolean' && e.canGoBack){ history.back(); }
-        else { Cap.Plugins.App.exitApp(); }
-      });
-    }catch(err){}
-  }
-  if(window.Capacitor) bindBack();
-  else document.addEventListener('DOMContentLoaded', bindBack);
-  setTimeout(bindBack, 800);
-})();
+/* Android Back button. MainActivity calls this first: true = handled in the app, false = nothing left to go back to. */
+var lastBack=0;
+function toast(t){var e=document.getElementById('toast');if(!e){e=document.createElement('div');e.id='toast';document.body.appendChild(e)}e.textContent=t;e.className='on';clearTimeout(toast.t);toast.t=setTimeout(function(){e.className=''},1800)}
+window.__spBack=function(){
+ if(PK||location.hash==='#pick'){history.back();return true}
+ if($('#sh').classList.contains('on')){history.back();return true}
+ if(goBack())return true;
+ var n=Date.now();if(n-lastBack<2000)return false;lastBack=n;toast('Press back again to leave SavePoint');return true};
 /* Recover Firebase redirect result + pending flag */
 (function(){
   function tryRedirect(){
+    if(nativeAuth())return;
     var p = fbInit && fbInit();
     if(!p) return;
     p.then(function(x){
@@ -976,7 +987,8 @@ if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(
   setTimeout(tryRedirect, 300);
   setTimeout(tryRedirect, 1200);
 })();
-
+(function(){var l=null;try{l=localStorage.getItem('sp_last')}catch(e){}if(!location.hash&&l&&/^(library|backlog|profile|prefs)$/.test(l)){location.replace('#'+l);stk=[l]}})();
+['bg-game.webp','bg-library.webp'].forEach(function(u){var i=new Image();i.src=u;if(i.decode)i.decode().catch(function(){})});
 route();
 })();
 </script>

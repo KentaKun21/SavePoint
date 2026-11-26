@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "557243659118-9m7dtvj80991r0ssnerc7gmphfsu49ch.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kentakun21.savepoint",
+            "certificate_hash": "6c688f1a4e372896f06e2222d6921e10e44caae8"
+          }
+        },
+        {
           "client_id": "557243659118-flq0vvk9f4rdaof8e5p24vkd3ed2plbm.apps.googleusercontent.com",
           "client_type": 3
         }
