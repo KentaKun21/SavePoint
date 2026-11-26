@@ -363,10 +363,11 @@ body.t-lib .bgpat::after {
   100% { opacity: 1; }
 }
 
-/* Red cover layer used on open */
+/* Red cover layer used on open — single clean wipe, no pre-wipe red flash */
 #sh.red-in {
   animation: none !important;
   opacity: 1 !important;
+  background: transparent !important;
 }
 #sh.red-in::before {
   content: "" !important;
@@ -375,9 +376,10 @@ body.t-lib .bgpat::after {
   z-index: 10002 !important;
   pointer-events: none !important;
   background: #e60018 !important;
+  will-change: clip-path;
   clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%);
-  animation: p5CoverIn .28s cubic-bezier(.2,.8,.2,1) forwards,
-             p5CoverOut .32s cubic-bezier(.4,0,.6,1) .34s forwards !important;
+  animation: p5CoverIn .26s cubic-bezier(.2,.8,.2,1) forwards,
+             p5CoverOut .30s cubic-bezier(.4,0,.6,1) .28s forwards !important;
   box-shadow: none !important;
   height: auto !important;
   left: 0 !important; right: 0 !important; top: 0 !important;
@@ -385,7 +387,8 @@ body.t-lib .bgpat::after {
 }
 #sh.red-in .cz,
 #sh.red-in .bgz {
-  animation: p5SheetIn .2s ease .45s both;
+  opacity: 0;
+  animation: p5SheetIn .16s ease .26s forwards !important;
 }
 
 /* Close: sheet itself tears away with jagged expand then gone */
@@ -675,39 +678,98 @@ function pull(x){x.F.getDoc(x.F.doc(x.db,'users',USER.uid)).then(function(snap){
  if(S.uid!==USER.uid&&S.g.length&&(r.ts||0)>0){pick('CLOUD SAVE FOUND',['Merge both saves','Use the cloud save','Keep this device (replaces the cloud)'],'',function(v){if(v[0]==='M'){S=mergeCloud(S,rd);S.uid=USER.uid;save();render(true);loadRec()}else if(v[0]==='U'){S=rd;S.ts=r.ts;S.uid=USER.uid;saveLocal();cloudPush();render(true);loadRec()}else{S.uid=USER.uid;save()}});return}
  if((r.ts||0)>(S.ts||0)){S=rd;S.ts=r.ts;S.uid=USER.uid;saveLocal();render(true);loadRec()}else if((S.ts||0)>(r.ts||0)){S.uid=USER.uid;saveLocal();cloudPush()}else{S.uid=USER.uid;saveLocal();cloudPush()}
  }).catch(syncErr)}
-var NA=null;
-function nativeAuth(){try{var C=window.Capacitor;if(C&&C.isNativePlatform&&C.isNativePlatform()&&C.registerPlugin)return NA||(NA=C.registerPlugin('FirebaseAuthentication'))}catch(e){}return null}
-/* Android: Google's own sign-in sheet gives an ID token; the Firebase JS SDK signs in with it, so cloud sync keeps working unchanged. */
-function nativeSignIn(x){var N=nativeAuth();
- N.signInWithGoogle().then(function(r){var t=r&&r.credential&&r.credential.idToken;if(!t)throw new Error('no-id-token');return x.A.signInWithCredential(x.auth,x.A.GoogleAuthProvider.credential(t))})
- .then(function(c){if(c&&c.user){USER=c.user;window.syncBad=0;if(tab==='set')render();msg('SIGNED IN AS '+(USER.email||'GOOGLE'),'OK')}})
- .catch(function(e){var c=String((e&&(e.code||e.message))||'ERROR');if(/cancel|12501|dismiss|no credential/i.test(c))return;msg('SIGN-IN FAILED: '+c.replace('auth/','').slice(0,70).toUpperCase()+'. SEE README: ADD THE SHA-1 IN FIREBASE.','OK')})}
-function authBtn(){var p=fbInit();if(!p){msg('GOOGLE SIGN-IN IS NOT SET UP YET. SEE README STEP 3.','OK');return}
- p.then(function(x){if(USER){pick('SIGN OUT?',['Yes, sign out','Cancel'],'',function(v){if(v[0]==='Y'){x.A.signOut(x.auth);var N=nativeAuth();if(N)N.signOut().catch(function(){})}});return}
-  if(nativeAuth()){nativeSignIn(x);return}
-  var pr=new x.A.GoogleAuthProvider();
-  pr.addScope('email');pr.addScope('profile');
-  pr.setCustomParameters({prompt:'select_account'});
-  /* Capacitor WebView: redirect breaks sessionStorage → white screen on firebase handler.
-     Prefer popup; if unsupported, try redirect only after storing a flag we can recover. */
-  var isNative=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
-  function ok(cred){if(cred&&cred.user){USER=cred.user;window.syncBad=0;if(tab==='set')render();msg('SIGNED IN AS '+(USER.email||'GOOGLE'),'OK')}}
-  function fail(e){if(!e)return;var code=String(e.code||e.message||'ERROR');
-   if(code.indexOf('popup-closed')>-1||code.indexOf('cancelled')>-1)return;
-   if(code.indexOf('missing-initial-state')>-1||code.indexOf('sessionStorage')>-1)
-    return msg('GOOGLE SIGN-IN FAILED ON THIS PHONE (WEBVIEW STORAGE). TRY AGAIN, OR ADD SHA-1 IN FIREBASE AND USE A NATIVE BUILD.','OK');
-   msg('SIGN-IN FAILED: '+code.replace('auth/','').toUpperCase(),'OK')}
-  /* Always try popup first — works in some WebViews and desktop */
-  x.A.signInWithPopup(x.auth,pr).then(ok).catch(function(e){
-   if(e&&(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment'||e.code==='auth/popup-closed-by-user')){
-    /* Last resort: redirect. Save marker so return can be detected. */
-    try{sessionStorage.setItem('sp_auth_pending','1');localStorage.setItem('sp_auth_pending','1')}catch(err){}
-    return x.A.signInWithRedirect(x.auth,pr).catch(fail);
+function isAndroidNative(){
+ try{var C=window.Capacitor;return !!(C&&C.isNativePlatform&&C.isNativePlatform())}catch(e){return false}
+}
+function openEmailAuthModal(x){
+ var mode='login',el=$('#pk');
+ function draw(){
+  var isReg=mode==='register',isReset=mode==='reset';
+  el.innerHTML='<div class="pkb" style="max-width:420px">'+
+   '<h2>'+(isReg?'CREATE ACCOUNT':isReset?'RESET PASSWORD':'EMAIL SIGN IN')+'</h2>'+
+   '<div class="fld" style="margin:10px 0"><input id="sp-em" type="email" autocomplete="email" placeholder="Email address"></div>'+
+   (isReset?'':'<div class="fld" style="margin:10px 0"><input id="sp-pw" type="password" autocomplete="'+(isReg?'new-password':'current-password')+'" placeholder="Password (min 6 chars)"></div>')+
+   '<button type="button" class="pki on" id="sp-auth-go">'+(isReg?'REGISTER & SYNC':isReset?'SEND RESET EMAIL':'SIGN IN')+'</button>'+
+   (isReset?'':'<button type="button" class="pki" id="sp-auth-mode">'+(isReg?'Already have an account? Sign in':'Need an account? Register')+'</button>')+
+   (isReset?'<button type="button" class="pki" id="sp-auth-back">Back to sign in</button>':'<button type="button" class="pki" id="sp-auth-rst">Forgot password?</button>')+
+   (!isAndroidNative()?'<button type="button" class="pki" id="sp-auth-gg">Continue with Google (Web)</button>':'')+
+   '<button type="button" class="pki" id="sp-auth-x">Cancel</button>'+
+  '</div>';
+  el.classList.add('on');
+  PK={o:[],cb:null};
+  $('#sp-auth-x').onclick=function(){el.classList.remove('on');PK=null};
+  if($('#sp-auth-mode'))$('#sp-auth-mode').onclick=function(){mode=isReg?'login':'register';draw()};
+  if($('#sp-auth-rst'))$('#sp-auth-rst').onclick=function(){mode='reset';draw()};
+  if($('#sp-auth-back'))$('#sp-auth-back').onclick=function(){mode='login';draw()};
+  if($('#sp-auth-gg'))$('#sp-auth-gg').onclick=function(){
+   el.classList.remove('on');PK=null;
+   var pr=new x.A.GoogleAuthProvider();
+   pr.addScope('email');pr.addScope('profile');
+   x.A.signInWithPopup(x.auth,pr).then(function(cred){
+    if(cred&&cred.user){USER=cred.user;window.syncBad=0;if(tab==='set')render();msg('SIGNED IN AS '+(USER.email||'GOOGLE'),'OK')}
+   }).catch(function(e){
+    var code=String((e&&(e.code||e.message))||'ERROR');
+    if(code.indexOf('popup-closed')>-1||code.indexOf('cancelled')>-1)return;
+    msg('GOOGLE SIGN-IN FAILED: '+code.replace('auth/','').toUpperCase(),'OK');
+   });
+  };
+  $('#sp-auth-go').onclick=function(){
+   var em=($('#sp-em').value||'').trim();
+   var pw=$('#sp-pw')?$('#sp-pw').value:'';
+   if(!em){msg('ENTER YOUR EMAIL ADDRESS','OK');return}
+   if(isReset){
+    x.A.sendPasswordResetEmail(x.auth,em).then(function(){
+     el.classList.remove('on');PK=null;
+     msg('PASSWORD RESET EMAIL SENT TO '+em.toUpperCase(),'OK');
+    }).catch(function(e){
+     var code=String((e&&(e.code||e.message))||'ERROR').replace('auth/','').toUpperCase();
+     msg('RESET FAILED: '+code,'OK');
+    });
+    return;
    }
-   fail(e);
-  })}).catch(function(){msg('COULD NOT LOAD SIGN-IN. CHECK YOUR CONNECTION.','OK')})}
+   if(!pw||pw.length<6){msg('PASSWORD MUST BE AT LEAST 6 CHARACTERS','OK');return}
+   var op=isReg
+    ?x.A.createUserWithEmailAndPassword(x.auth,em,pw)
+    :x.A.signInWithEmailAndPassword(x.auth,em,pw);
+   op.then(function(cred){
+    el.classList.remove('on');PK=null;
+    if(cred&&cred.user){
+     USER=cred.user;window.syncBad=0;
+     if(tab==='set')render();
+     msg((isReg?'ACCOUNT CREATED: ':'SIGNED IN AS ')+(USER.email||em).toUpperCase(),'OK');
+    }
+   }).catch(function(e){
+    var code=String((e&&(e.code||e.message))||'ERROR').replace('auth/','').toUpperCase();
+    msg('AUTH FAILED: '+code,'OK');
+   });
+  };
+ }
+ draw();
+}
+function authBtn(){
+ var p=fbInit();
+ if(!p){msg('FIREBASE IS NOT CONFIGURED YET. CHECK CONFIG.JS.','OK');return}
+ p.then(function(x){
+  if(USER){
+   pick('SIGN OUT OF '+esc((USER.email||'ACCOUNT').toUpperCase())+'?',['Yes, sign out','Cancel'],'',function(v){
+    if(v[0]==='Y'){
+     x.A.signOut(x.auth).then(function(){
+      USER=null;window.syncBad=0;if(tab==='set')render();
+      msg('SIGNED OUT','OK');
+     });
+    }
+   });
+   return;
+  }
+  openEmailAuthModal(x);
+ }).catch(function(){msg('COULD NOT LOAD FIREBASE AUTH. CHECK YOUR CONNECTION.','OK')});
+}
 function syncNow(){if(!USER)return;S.ts=Date.now();saveLocal();cloudPush();msg('SYNCING…','OK')}
-function acctRows0(){var on=CFG.FIREBASE&&CFG.FIREBASE.apiKey;if(USER)return'<button class="srow" data-a="google">'+esc(USER.email||'Google account')+'<b>SIGN OUT</b></button><button class="srow" data-a="sync">Cloud sync<b>'+(window.syncBad?'ERROR · RETRY':'ON')+'</b></button>';return'<button class="srow" data-a="google">Link Google account<b>'+(on?'LINK':'SET UP')+'</b></button>'}
+function acctRows0(){
+ var on=CFG.FIREBASE&&CFG.FIREBASE.apiKey;
+ if(USER)return'<button class="srow" data-a="google">'+esc(USER.email||'Signed-in account')+'<b>SIGN OUT</b></button><button class="srow" data-a="sync">Cloud sync<b>'+(window.syncBad?'ERROR · RETRY':'ON')+'</b></button>';
+ return'<button class="srow" data-a="google">Account sign in / register<b>'+(on?'SIGN IN':'SET UP')+'</b></button>';
+}
 var SRCH='<svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="M15 15l6 6"/></svg>';
 function fmtBytes(n){if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(2)+' MB'}
 function gameRichness(g){
@@ -861,7 +923,7 @@ function route(){var h=location.hash.slice(1)||'home';
  if(pushing){stk.push(h);pushing=false}else{var j=stk.lastIndexOf(h);if(j>-1&&j<stk.length-1)stk.length=j+1;else if(stk[stk.length-1]!==h)stk.push(h)}
  if(h==='pick'){if(!PK){stk=['home'];location.replace('#home');return}$('#pk').classList.add('on');return}
  $('#pk').classList.remove('on');PK=null;
- if(h==='game'){if(!D){stk=['home'];location.replace('#home');return}if(!$('#sh').classList.contains('on')){showSheet();$('#sh').classList.remove('paper-out','phone-in','red-in','bg-ready');$('#sh').classList.add('on');if(S.set.anim){void $('#sh').offsetWidth;$('#sh').classList.add('red-in');setTimeout(function(){$('#sh').classList.add('bg-ready')},290);setTimeout(function(){$('#sh').classList.remove('red-in','bg-ready')},680)}$('#sh').scrollTop=0;document.body.style.overflow='hidden'}return}
+ if(h==='game'){if(!D){stk=['home'];location.replace('#home');return}if(!$('#sh').classList.contains('on')){showSheet();$('#sh').classList.remove('paper-out','phone-in','red-in','bg-ready');$('#sh').classList.add('on');if(S.set.anim){$('#sh').classList.add('red-in');setTimeout(function(){$('#sh').classList.add('bg-ready')},260);setTimeout(function(){$('#sh').classList.remove('red-in','bg-ready')},600)}$('#sh').scrollTop=0;document.body.style.overflow='hidden'}return}
  var was=$('#sh').classList.contains('on');if(was&&S.set.anim){$('#sh').classList.remove('phone-in');$('#sh').classList.add('paper-out');setTimeout(function(){$('#sh').classList.remove('paper-out','on')},580)}else $('#sh').classList.remove('on');document.body.style.overflow='';
  var t=TABS[h]||'home',ch=t!==tab;tab=t;try{localStorage.setItem('sp_last',HASH[t])}catch(e){}if(ch&&t!=='lib')q='';if(ch&&t==='lib'&&!window._keepLt)lt='games';window._keepLt=0;
  var fast=ch&&(Date.now()-(window._lastSw||0)<400);if(ch)window._lastSw=Date.now();
