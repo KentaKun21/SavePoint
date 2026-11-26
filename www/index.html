@@ -363,7 +363,17 @@ body.t-lib .bgpat::after {
   100% { opacity: 1; }
 }
 
-/* Red cover layer used on open — single clean wipe, no pre-wipe red flash */
+@keyframes spSlashSweep {
+  0%   { transform: translateX(-115%) skewX(-12deg); }
+  48%  { transform: translateX(0%) skewX(-12deg); }
+  100% { transform: translateX(115%) skewX(-12deg); }
+}
+@keyframes spSheetReveal {
+  0%   { opacity: 0; transform: translateX(24px) skewX(-3deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* Red cover layer used on open — angled slash sweep into game sheet */
 #sh.red-in {
   animation: none !important;
   opacity: 1 !important;
@@ -372,23 +382,28 @@ body.t-lib .bgpat::after {
 #sh.red-in::before {
   content: "" !important;
   position: fixed !important;
-  inset: 0 !important;
+  inset: -10% -20% !important;
   z-index: 10002 !important;
   pointer-events: none !important;
-  background: #e60018 !important;
-  will-change: clip-path;
-  clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%);
-  animation: p5CoverIn .26s cubic-bezier(.2,.8,.2,1) forwards,
-             p5CoverOut .30s cubic-bezier(.4,0,.6,1) .28s forwards !important;
-  box-shadow: none !important;
-  height: auto !important;
-  left: 0 !important; right: 0 !important; top: 0 !important;
-  transform: none !important;
+  background: linear-gradient(105deg, #b80014 0%, #e60018 55%, #ff1e32 100%) !important;
+  box-shadow: -14px 0 0 #0a0a0a, 14px 0 0 #ffffff !important;
+  will-change: transform;
+  transform: translateX(-115%) skewX(-12deg);
+  animation: spSlashSweep .46s cubic-bezier(.16,.84,.24,1) forwards !important;
 }
 #sh.red-in .cz,
 #sh.red-in .bgz {
   opacity: 0;
-  animation: p5SheetIn .16s ease .26s forwards !important;
+  animation: spSheetReveal .24s cubic-bezier(.22,.8,.36,1) .19s forwards !important;
+}
+
+.sp-pw-field {
+  -webkit-text-security: disc;
+  text-security: disc;
+}
+.sp-pw-field.is-visible {
+  -webkit-text-security: none;
+  text-security: none;
 }
 
 /* Close: sheet itself tears away with jagged expand then gone */
@@ -682,23 +697,31 @@ function isAndroidNative(){
  try{var C=window.Capacitor;return !!(C&&C.isNativePlatform&&C.isNativePlatform())}catch(e){return false}
 }
 function openEmailAuthModal(x){
- var mode='login',el=$('#pk');
+ var mode='login',showPw=false,el=$('#pk');
  function draw(){
   var isReg=mode==='register',isReset=mode==='reset';
-  el.innerHTML='<div class="pkb" style="max-width:420px">'+
-   '<h2>'+(isReg?'CREATE ACCOUNT':isReset?'RESET PASSWORD':'EMAIL SIGN IN')+'</h2>'+
-   '<div class="fld" style="margin:10px 0"><input id="sp-em" type="email" autocomplete="email" placeholder="Email address"></div>'+
-   (isReset?'':'<div class="fld" style="margin:10px 0"><input id="sp-pw" type="password" autocomplete="'+(isReg?'new-password':'current-password')+'" placeholder="Password (min 6 chars)"></div>')+
-   '<button type="button" class="pki on" id="sp-auth-go">'+(isReg?'REGISTER & SYNC':isReset?'SEND RESET EMAIL':'SIGN IN')+'</button>'+
-   (isReset?'':'<button type="button" class="pki" id="sp-auth-mode">'+(isReg?'Already have an account? Sign in':'Need an account? Register')+'</button>')+
-   (isReset?'<button type="button" class="pki" id="sp-auth-back">Back to sign in</button>':'<button type="button" class="pki" id="sp-auth-rst">Forgot password?</button>')+
-   (!isAndroidNative()?'<button type="button" class="pki" id="sp-auth-gg">Continue with Google (Web)</button>':'')+
-   '<button type="button" class="pki" id="sp-auth-x">Cancel</button>'+
+  el.innerHTML='<div class="pkb" style="max-width:440px">'+
+   '<h2>'+(isReg?'NEW ACCOUNT':isReset?'RESET PASSWORD':'SIGN IN')+'</h2>'+
+   '<div class="fld" style="margin:10px 0"><input id="sp-em" type="email" inputmode="email" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="EMAIL ADDRESS"></div>'+
+   (isReset?'':'<div class="fld" style="margin:10px 0;display:flex;align-items:center"><input id="sp-pw" class="sp-pw-field'+(showPw?' is-visible':'')+'" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-gramm="false" placeholder="PASSWORD (6+ CHARS)" style="flex:1"><button type="button" id="sp-pw-eye" style="width:auto;padding:8px 12px;font-size:14px">'+(showPw?'HIDE':'SHOW')+'</button></div>')+
+   '<button type="button" class="pki on" id="sp-auth-go">'+(isReg?'CREATE ACCOUNT':isReset?'SEND RESET LINK':'SIGN IN')+'</button>'+
+   (isReset?'':'<button type="button" class="pki" id="sp-auth-mode">'+(isReg?'HAVE AN ACCOUNT? SIGN IN':'NEED AN ACCOUNT? REGISTER')+'</button>')+
+   (isReset?'<button type="button" class="pki" id="sp-auth-back">BACK TO SIGN IN</button>':'<button type="button" class="pki" id="sp-auth-rst">FORGOT PASSWORD?</button>')+
+   (!isAndroidNative()?'<button type="button" class="pki" id="sp-auth-gg">CONTINUE WITH GOOGLE (WEB)</button>':'')+
+   '<button type="button" class="pki" id="sp-auth-x">CANCEL</button>'+
   '</div>';
   el.classList.add('on');
   PK={o:[],cb:null};
   $('#sp-auth-x').onclick=function(){el.classList.remove('on');PK=null};
-  if($('#sp-auth-mode'))$('#sp-auth-mode').onclick=function(){mode=isReg?'login':'register';draw()};
+  if($('#sp-pw-eye'))$('#sp-pw-eye').onclick=function(){
+   var curEm=$('#sp-em')?$('#sp-em').value:'';
+   var curPw=$('#sp-pw')?$('#sp-pw').value:'';
+   showPw=!showPw;
+   draw();
+   if($('#sp-em'))$('#sp-em').value=curEm;
+   if($('#sp-pw')){$('#sp-pw').value=curPw;$('#sp-pw').focus()}
+  };
+  if($('#sp-auth-mode'))$('#sp-auth-mode').onclick=function(){mode=isReg?'login':'register';showPw=false;draw()};
   if($('#sp-auth-rst'))$('#sp-auth-rst').onclick=function(){mode='reset';draw()};
   if($('#sp-auth-back'))$('#sp-auth-back').onclick=function(){mode='login';draw()};
   if($('#sp-auth-gg'))$('#sp-auth-gg').onclick=function(){
@@ -720,26 +743,28 @@ function openEmailAuthModal(x){
    if(isReset){
     x.A.sendPasswordResetEmail(x.auth,em).then(function(){
      el.classList.remove('on');PK=null;
-     msg('PASSWORD RESET EMAIL SENT TO '+em.toUpperCase(),'OK');
+     msg('RESET EMAIL SENT TO '+em.toUpperCase(),'OK');
     }).catch(function(e){
      var code=String((e&&(e.code||e.message))||'ERROR').replace('auth/','').toUpperCase();
      msg('RESET FAILED: '+code,'OK');
     });
     return;
    }
-   if(!pw||pw.length<6){msg('PASSWORD MUST BE AT LEAST 6 CHARACTERS','OK');return}
-   var op=isReg
-    ?x.A.createUserWithEmailAndPassword(x.auth,em,pw)
-    :x.A.signInWithEmailAndPassword(x.auth,em,pw);
-   op.then(function(cred){
+   if(pw.length<6){msg('PASSWORD MUST BE AT LEAST 6 CHARACTERS','OK');return}
+   var fn=isReg?x.A.createUserWithEmailAndPassword:x.A.signInWithEmailAndPassword;
+   fn(x.auth,em,pw).then(function(cred){
     el.classList.remove('on');PK=null;
     if(cred&&cred.user){
      USER=cred.user;window.syncBad=0;
      if(tab==='set')render();
-     msg((isReg?'ACCOUNT CREATED: ':'SIGNED IN AS ')+(USER.email||em).toUpperCase(),'OK');
+     msg((isReg?'REGISTERED: ':'SIGNED IN: ')+(USER.email||em).toUpperCase(),'OK');
     }
    }).catch(function(e){
     var code=String((e&&(e.code||e.message))||'ERROR').replace('auth/','').toUpperCase();
+    if(code.indexOf('OPERATION-NOT-ALLOWED')>-1){
+     msg('ENABLE EMAIL/PASSWORD IN FIREBASE CONSOLE → AUTH → SIGN-IN METHOD','OK');
+     return;
+    }
     msg('AUTH FAILED: '+code,'OK');
    });
   };
@@ -923,7 +948,7 @@ function route(){var h=location.hash.slice(1)||'home';
  if(pushing){stk.push(h);pushing=false}else{var j=stk.lastIndexOf(h);if(j>-1&&j<stk.length-1)stk.length=j+1;else if(stk[stk.length-1]!==h)stk.push(h)}
  if(h==='pick'){if(!PK){stk=['home'];location.replace('#home');return}$('#pk').classList.add('on');return}
  $('#pk').classList.remove('on');PK=null;
- if(h==='game'){if(!D){stk=['home'];location.replace('#home');return}if(!$('#sh').classList.contains('on')){showSheet();$('#sh').classList.remove('paper-out','phone-in','red-in','bg-ready');$('#sh').classList.add('on');if(S.set.anim){$('#sh').classList.add('red-in');setTimeout(function(){$('#sh').classList.add('bg-ready')},260);setTimeout(function(){$('#sh').classList.remove('red-in','bg-ready')},600)}$('#sh').scrollTop=0;document.body.style.overflow='hidden'}return}
+ if(h==='game'){if(!D){stk=['home'];location.replace('#home');return}if(!$('#sh').classList.contains('on')){showSheet();$('#sh').classList.remove('paper-out','phone-in','red-in','bg-ready');$('#sh').classList.add('on');if(S.set.anim){$('#sh').classList.add('red-in');setTimeout(function(){$('#sh').classList.add('bg-ready')},200);setTimeout(function(){$('#sh').classList.remove('red-in','bg-ready')},500)}$('#sh').scrollTop=0;document.body.style.overflow='hidden'}return}
  var was=$('#sh').classList.contains('on');if(was&&S.set.anim){$('#sh').classList.remove('phone-in');$('#sh').classList.add('paper-out');setTimeout(function(){$('#sh').classList.remove('paper-out','on')},580)}else $('#sh').classList.remove('on');document.body.style.overflow='';
  var t=TABS[h]||'home',ch=t!==tab;tab=t;try{localStorage.setItem('sp_last',HASH[t])}catch(e){}if(ch&&t!=='lib')q='';if(ch&&t==='lib'&&!window._keepLt)lt='games';window._keepLt=0;
  var fast=ch&&(Date.now()-(window._lastSw||0)<400);if(ch)window._lastSw=Date.now();
